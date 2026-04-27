@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOID — Ephemeral Chat</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #080a0c;
+  --bg1: #0d1117;
+  --bg2: #111820;
+  --bg3: #1a2332;
+  --line: #1e2d3d;
+  --line2: #243040;
+  --accent: #00d4ff;
+  --accent2: #0099bb;
+  --accent-dim: rgba(0,212,255,0.12);
+  --accent-glow: rgba(0,212,255,0.25);
+  --warn: #ff6b35;
+  --danger: #ff3355;
+  --green: #00ff88;
+  --text: #c8d8e8;
+  --text2: #6b8499;
+  --text3: #3d5060;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Syne', sans-serif;
+  --radius: 3px;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+  overflow: hidden;
+}
+
+/* ── NOISE OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.6;
+}
+
+/* ── SCAN LINES ── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* ── SCREENS ── */
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.screen.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ── LOGO / BRAND ── */
+.brand {
+  position: fixed;
+  top: 24px;
+  left: 28px;
+  font-family: var(--sans);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+  text-shadow: 0 0 20px var(--accent-glow);
+  z-index: 100;
+  user-select: none;
+}
+.brand span { color: var(--text3); font-weight: 400; font-size: 11px; letter-spacing: 0.3em; display: block; margin-top: -2px; }
+
+/* ── PANEL ── */
+.panel {
+  background: var(--bg1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 40px 44px;
+  width: 420px;
+  position: relative;
+  box-shadow: 0 0 60px rgba(0,0,0,0.6), 0 0 120px rgba(0,212,255,0.04);
+}
+.panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 20px; right: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.6;
+}
+
+.panel-title {
+  font-family: var(--sans);
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 6px;
+}
+.panel-sub {
+  font-size: 11px;
+  color: var(--text2);
+  letter-spacing: 0.05em;
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+/* ── FORM ELEMENTS ── */
+.field {
+  margin-bottom: 16px;
+}
+.field label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--text2);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.field input {
+  width: 100%;
+  background: var(--bg2);
+  border: 1px solid var(--line2);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  -webkit-appearance: none;
+}
+.field input:focus {
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.field input::placeholder { color: var(--text3); }
+
+/* ── BUTTONS ── */
+.btn {
+  width: 100%;
+  padding: 13px;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0);
+  transition: background 0.15s;
+}
+.btn:hover::after { background: rgba(255,255,255,0.06); }
+.btn:active::after { background: rgba(255,255,255,0.12); }
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  box-shadow: 0 0 20px rgba(0,212,255,0.3);
+}
+.btn-primary:hover { box-shadow: 0 0 30px rgba(0,212,255,0.5); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--line2);
+  margin-top: 10px;
+}
+.btn-ghost:hover { color: var(--text); border-color: var(--text3); }
+
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(255,51,85,0.3);
+}
+
+/* ── CHOICE BUTTONS ── */
+.choice-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 0;
+}
+.btn-choice {
+  padding: 20px 16px;
+  background: var(--bg2);
+  border: 1px solid var(--line2);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  line-height: 1.8;
+}
+.btn-choice .icon { display: block; font-size: 22px; margin-bottom: 8px; }
+.btn-choice:hover {
+  border-color: var(--accent2);
+  background: var(--accent-dim);
+  color: var(--accent);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+/* ── DIVIDER ── */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: var(--text3);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+}
+.divider::before, .divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+/* ── ERROR ── */
+.error-msg {
+  background: rgba(255,51,85,0.1);
+  border: 1px solid rgba(255,51,85,0.3);
+  border-radius: var(--radius);
+  color: var(--danger);
+  font-size: 12px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  display: none;
+}
+.error-msg.show { display: block; }
+
+/* ── ROOM ID DISPLAY ── */
+.room-id-box {
+  background: var(--bg);
+  border: 1px solid var(--line2);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin: 20px 0;
+  position: relative;
+}
+.room-id-box .label {
+  font-size: 10px;
+  color: var(--text2);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.room-id-box .value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.3em;
+  text-shadow: 0 0 20px var(--accent-glow);
+}
+.room-id-box .copy-btn {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--bg2);
+  border: 1px solid var(--line2);
+  border-radius: var(--radius);
+  color: var(--text2);
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  letter-spacing: 0.1em;
+  transition: all 0.2s;
+}
+.room-id-box .copy-btn:hover { color: var(--accent); border-color: var(--accent2); }
+
+/* ── CHAT SCREEN ── */
+#chat-screen {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+}
+
+.chat-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+}
+
+/* ── CHAT HEADER ── */
+.chat-header {
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  height: 56px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg1);
+  flex-shrink: 0;
+  gap: 16px;
+  position: relative;
+}
+.chat-header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-dim), transparent);
+}
+
+.chat-room-name {
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  flex: 1;
+}
+
+.chat-room-id {
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 0.15em;
+}
+
+.user-badge {
+  background: var(--accent-dim);
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 2px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.member-count {
+  font-size: 11px;
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.member-count .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.btn-leave {
+  background: transparent;
+  border: 1px solid rgba(255,51,85,0.3);
+  border-radius: var(--radius);
+  color: rgba(255,51,85,0.6);
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 5px 10px;
+  cursor: pointer;
+  letter-spacing: 0.1em;
+  transition: all 0.2s;
+}
+.btn-leave:hover { color: var(--danger); border-color: var(--danger); background: rgba(255,51,85,0.08); }
+
+/* ── MESSAGES ── */
+.messages-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scroll-behavior: smooth;
+}
+.messages-area::-webkit-scrollbar { width: 4px; }
+.messages-area::-webkit-scrollbar-track { background: transparent; }
+.messages-area::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 2px; }
+
+/* ── MESSAGE BUBBLE ── */
+.msg-group {
+  display: flex;
+  flex-direction: column;
+  margin: 6px 0;
+  max-width: 72%;
+  position: relative;
+  animation: msgIn 0.2s ease;
+}
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.msg-group.mine { align-self: flex-end; align-items: flex-end; }
+.msg-group.theirs { align-self: flex-start; align-items: flex-start; }
+
+.msg-sender {
+  font-size: 10px;
+  color: var(--text2);
+  letter-spacing: 0.1em;
+  margin-bottom: 4px;
+  padding: 0 4px;
+}
+
+.msg-bubble {
+  padding: 10px 14px;
+  border-radius: 3px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  position: relative;
+  word-break: break-word;
+  transition: opacity 0.5s;
+}
+
+.msg-group.mine .msg-bubble {
+  background: var(--accent-dim);
+  border: 1px solid rgba(0,212,255,0.2);
+  color: var(--text);
+}
+
+.msg-group.theirs .msg-bubble {
+  background: var(--bg2);
+  border: 1px solid var(--line2);
+  color: var(--text);
+}
+
+.msg-bubble.expiring {
+  opacity: 0.35;
+  border-style: dashed;
+}
+
+.msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 0 4px;
+}
+
+.msg-time {
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 0.05em;
+}
+
+.msg-status {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+.msg-status.sending { color: var(--text3); }
+.msg-status.delivered { color: var(--green); }
+.msg-status.transit { color: var(--warn); }
+
+/* Expiry timer bar */
+.expiry-bar {
+  position: absolute;
+  bottom: 0; left: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 0 0 0 3px;
+  width: 100%;
+  transform-origin: left;
+  transition: transform 60s linear;
+}
+.expiry-bar.ticking { transform: scaleX(0); }
+
+/* ── SYSTEM MESSAGES ── */
+.sys-msg {
+  align-self: center;
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: 0.08em;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  margin: 8px 0;
+  background: var(--bg1);
+  animation: msgIn 0.3s ease;
+}
+.sys-msg.warn {
+  color: var(--warn);
+  border-color: rgba(255,107,53,0.3);
+  background: rgba(255,107,53,0.06);
+}
+
+/* ── INPUT AREA ── */
+.input-area {
+  border-top: 1px solid var(--line);
+  background: var(--bg1);
+  padding: 16px 24px;
+  flex-shrink: 0;
+  position: relative;
+}
+.input-area::before {
+  content: '';
+  position: absolute;
+  top: -1px; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-dim), transparent);
+}
+
+.input-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.msg-input {
+  flex: 1;
+  background: var(--bg2);
+  border: 1px solid var(--line2);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13.5px;
+  padding: 12px 14px;
+  outline: none;
+  resize: none;
+  min-height: 46px;
+  max-height: 140px;
+  overflow-y: auto;
+  line-height: 1.5;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.msg-input:focus {
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.msg-input::placeholder { color: var(--text3); }
+.msg-input::-webkit-scrollbar { width: 3px; }
+.msg-input::-webkit-scrollbar-thumb { background: var(--line2); }
+
+.send-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #000;
+  width: 46px;
+  height: 46px;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  box-shadow: 0 0 14px rgba(0,212,255,0.3);
+}
+.send-btn:hover { box-shadow: 0 0 24px rgba(0,212,255,0.5); transform: scale(1.04); }
+.send-btn:active { transform: scale(0.96); }
+.send-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.e2ee-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 0.08em;
+  margin-top: 8px;
+}
+.e2ee-badge::before {
+  content: '🔒';
+  font-size: 10px;
+}
+
+/* ── LOADING ── */
+.loader {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid var(--line2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── WAITING OVERLAY ── */
+.waiting-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8,10,12,0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  backdrop-filter: blur(4px);
+}
+.waiting-overlay.show { display: flex; }
+.waiting-card {
+  background: var(--bg1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 40px;
+  text-align: center;
+  max-width: 340px;
+  box-shadow: 0 0 60px rgba(0,0,0,0.6);
+}
+.waiting-card .room-code {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.3em;
+  text-shadow: 0 0 30px var(--accent-glow);
+  margin: 16px 0;
+}
+.waiting-card .pass-hint {
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 8px;
+}
+.timer-ring {
+  width: 60px; height: 60px;
+  position: relative;
+  margin: 20px auto 0;
+}
+.timer-ring svg {
+  transform: rotate(-90deg);
+}
+.timer-ring circle {
+  fill: none;
+  stroke: var(--line2);
+  stroke-width: 3;
+}
+.timer-ring .progress {
+  stroke: var(--accent);
+  stroke-dasharray: 163;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear, stroke 1s;
+  filter: drop-shadow(0 0 4px var(--accent));
+}
+.timer-ring .timer-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.panel { animation: fadeUp 0.4s ease; }
+
+/* ── STEP INDICATOR ── */
+.steps {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 28px;
+}
+.step {
+  height: 2px;
+  flex: 1;
+  background: var(--line2);
+  border-radius: 2px;
+  transition: background 0.3s;
+}
+.step.done { background: var(--accent); }
+.step.active { background: var(--accent); opacity: 0.5; }
+</style>
+</head>
+<body>
+
+<div class="brand">VOID<span>EPHEMERAL · ENCRYPTED</span></div>
+
+<!-- ══ SCREEN 1: Enter name ══ -->
+<div class="screen active" id="screen-name">
+  <div class="panel">
+    <div class="steps">
+      <div class="step active"></div>
+      <div class="step"></div>
+      <div class="step"></div>
+    </div>
+    <div class="panel-title">Enter your name</div>
+    <div class="panel-sub">No account. No storage. You exist only for this session.</div>
+    <div class="field">
+      <label>Display Name</label>
+      <input type="text" id="username-input" placeholder="e.g. ghost_42" maxlength="24" autocomplete="off" spellcheck="false">
+    </div>
+    <button class="btn btn-primary" id="name-next-btn">CONTINUE →</button>
+    <div class="error-msg" id="name-error"></div>
+  </div>
+</div>
+
+<!-- ══ SCREEN 2: Create or Join ══ -->
+<div class="screen" id="screen-choice">
+  <div class="panel">
+    <div class="steps">
+      <div class="step done"></div>
+      <div class="step active"></div>
+      <div class="step"></div>
+    </div>
+    <div class="panel-title">What do you want?</div>
+    <div class="panel-sub">Rooms are temporary. No history. No trace.</div>
+    <div class="choice-row">
+      <button class="btn-choice" id="btn-create">
+        <span class="icon">⊕</span>
+        Create Room
+      </button>
+      <button class="btn-choice" id="btn-join">
+        <span class="icon">⊞</span>
+        Join Room
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCREEN 3a: Create Room ══ -->
+<div class="screen" id="screen-create">
+  <div class="panel">
+    <div class="steps">
+      <div class="step done"></div>
+      <div class="step done"></div>
+      <div class="step active"></div>
+    </div>
+    <div class="panel-title">Create Room</div>
+    <div class="panel-sub">You'll get an 8-character room ID to share. Password is the encryption key.</div>
+    <div class="field">
+      <label>Room Name</label>
+      <input type="text" id="create-name-input" placeholder="e.g. secure-channel" maxlength="32" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Password (shared encryption key)</label>
+      <input type="password" id="create-pass-input" placeholder="min. 4 characters" autocomplete="new-password">
+    </div>
+    <button class="btn btn-primary" id="create-btn">CREATE ROOM</button>
+    <button class="btn btn-ghost" id="back-to-choice-1">← BACK</button>
+    <div class="error-msg" id="create-error"></div>
+  </div>
+</div>
+
+<!-- ══ SCREEN 3b: Join Room ══ -->
+<div class="screen" id="screen-join">
+  <div class="panel">
+    <div class="steps">
+      <div class="step done"></div>
+      <div class="step done"></div>
+      <div class="step active"></div>
+    </div>
+    <div class="panel-title">Join Room</div>
+    <div class="panel-sub">Enter the room ID and password from the room creator.</div>
+    <div class="field">
+      <label>Room ID</label>
+      <input type="text" id="join-id-input" placeholder="e.g. A3F9B2C1" maxlength="8"
+             autocomplete="off" spellcheck="false" style="text-transform:uppercase;letter-spacing:0.2em">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="join-pass-input" placeholder="room password" autocomplete="off">
+    </div>
+    <button class="btn btn-primary" id="join-btn">JOIN ROOM</button>
+    <button class="btn btn-ghost" id="back-to-choice-2">← BACK</button>
+    <div class="error-msg" id="join-error"></div>
+  </div>
+</div>
+
+<!-- ══ SCREEN 4: Chat ══ -->
+<div class="screen" id="chat-screen">
+  <div class="chat-layout">
+    <div class="chat-header">
+      <div>
+        <div class="chat-room-name" id="header-room-name">—</div>
+        <div class="chat-room-id" id="header-room-id">ID: —</div>
+      </div>
+      <div class="member-count">
+        <span class="dot"></span>
+        <span id="header-user-count">1</span> online
+      </div>
+      <div class="user-badge" id="header-username">—</div>
+      <button class="btn-leave" id="leave-btn">LEAVE</button>
+    </div>
+
+    <div class="messages-area" id="messages-area"></div>
+
+    <div class="input-area">
+      <div class="input-row">
+        <textarea class="msg-input" id="msg-input" placeholder="Type a message…" rows="1" maxlength="2000"></textarea>
+        <button class="send-btn" id="send-btn" disabled>↑</button>
+      </div>
+      <div class="e2ee-badge">End-to-end encrypted · Messages self-destruct after delivery</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ WAITING OVERLAY ══ -->
+<div class="waiting-overlay" id="waiting-overlay">
+  <div class="waiting-card">
+    <div style="font-size:12px;color:var(--text2);letter-spacing:0.2em;text-transform:uppercase;">Share these to invite</div>
+    <div class="room-code" id="waiting-room-id">—</div>
+    <div class="pass-hint">🔑 Password: <span id="waiting-pass-hint" style="color:var(--warn)">(what you set)</span></div>
+    <div style="font-size:12px;color:var(--text3);margin-top:16px;line-height:1.7;">
+      Waiting for someone to join…<br>
+      Room closes if no one joins in
+    </div>
+    <div class="timer-ring">
+      <svg width="60" height="60">
+        <circle cx="30" cy="30" r="26"/>
+        <circle class="progress" id="timer-ring-progress" cx="30" cy="30" r="26"/>
+      </svg>
+      <div class="timer-text" id="timer-ring-text">10:00</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  VOID CHAT — Client-side E2EE
+//  Encryption: PBKDF2(password + roomId) → AES-GCM key
+//  Server sees only ciphertext + IV, never plaintext
+// ═══════════════════════════════════════════════════════════
+
+const $ = id => document.getElementById(id);
+
+// ── State ──────────────────────────────────────────────────
+let state = {
+  username: '',
+  userId: crypto.randomUUID(),
+  roomId: '',
+  roomName: '',
+  password: '',
+  cryptoKey: null,
+  ws: null,
+  messages: new Map(),   // msg_id → DOM element
+  userCount: 1,
+  isCreator: false,
+  waitingTimer: null,
+  waitingSeconds: 600,
+};
+
+// ── Screen routing ─────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+
+// ── Screen 1: Name ─────────────────────────────────────────
+$('name-next-btn').onclick = () => {
+  const name = $('username-input').value.trim();
+  if (!name || name.length < 1) return showError('name-error', 'Enter a display name');
+  state.username = name;
+  showScreen('screen-choice');
+};
+$('username-input').onkeydown = e => { if (e.key === 'Enter') $('name-next-btn').click(); };
+
+// ── Screen 2: Choice ───────────────────────────────────────
+$('btn-create').onclick = () => showScreen('screen-create');
+$('btn-join').onclick   = () => showScreen('screen-join');
+$('back-to-choice-1').onclick = () => showScreen('screen-choice');
+$('back-to-choice-2').onclick = () => showScreen('screen-choice');
+
+// ── Screen 3a: Create ──────────────────────────────────────
+$('create-btn').onclick = async () => {
+  const name = $('create-name-input').value.trim();
+  const pass = $('create-pass-input').value;
+  if (!name)        return showError('create-error', 'Enter a room name');
+  if (pass.length < 4) return showError('create-error', 'Password must be at least 4 characters');
+
+  $('create-btn').innerHTML = '<span class="loader"></span>';
+  $('create-btn').disabled = true;
+
+  try {
+    const res = await fetch('/api/room/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, password: pass }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed');
+
+    state.roomId   = data.room_id;
+    state.roomName = data.room_name;
+    state.password = pass;
+    state.isCreator = true;
+    state.cryptoKey = await deriveKey(pass, data.room_id);
+
+    await enterChat();
+    startWaitingOverlay();
+  } catch (err) {
+    showError('create-error', err.message);
+  } finally {
+    $('create-btn').innerHTML = 'CREATE ROOM';
+    $('create-btn').disabled = false;
+  }
+};
+
+// ── Screen 3b: Join ────────────────────────────────────────
+$('join-btn').onclick = async () => {
+  const roomId = $('join-id-input').value.trim().toUpperCase();
+  const pass   = $('join-pass-input').value;
+  if (roomId.length !== 8) return showError('join-error', 'Room ID must be 8 characters');
+  if (!pass)               return showError('join-error', 'Enter the password');
+
+  $('join-btn').innerHTML = '<span class="loader"></span>';
+  $('join-btn').disabled = true;
+
+  try {
+    const res = await fetch('/api/room/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room_id: roomId, password: pass }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed');
+
+    state.roomId   = data.room_id;
+    state.roomName = data.room_name;
+    state.password = pass;
+    state.isCreator = false;
+    state.cryptoKey = await deriveKey(pass, data.room_id);
+
+    await enterChat();
+  } catch (err) {
+    showError('join-error', err.message);
+  } finally {
+    $('join-btn').innerHTML = 'JOIN ROOM';
+    $('join-btn').disabled = false;
+  }
+};
+
+// ── Chat entry ─────────────────────────────────────────────
+async function enterChat() {
+  $('header-room-name').textContent = state.roomName;
+  $('header-room-id').textContent   = 'ID: ' + state.roomId;
+  $('header-username').textContent  = state.username;
+  showScreen('chat-screen');
+  connectWS();
+}
+
+// ── WebSocket ──────────────────────────────────────────────
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const url = `${proto}://${location.host}/ws/${state.roomId}/${state.userId}/${encodeURIComponent(state.username)}`;
+  state.ws = new WebSocket(url);
+
+  state.ws.onopen = () => {
+    $('send-btn').disabled = false;
+  };
+
+  state.ws.onmessage = async e => {
+    const data = JSON.parse(e.data);
+    await handleServerMsg(data);
+  };
+
+  state.ws.onclose = () => {
+    $('send-btn').disabled = true;
+    appendSysMsg('Connection closed. Refresh to reconnect.', true);
+  };
+
+  state.ws.onerror = () => {
+    appendSysMsg('Connection error.', true);
+  };
+}
+
+async function handleServerMsg(data) {
+  switch (data.type) {
+    case 'system':
+      await handleSystemMsg(data);
+      break;
+    case 'message':
+      await handleIncoming(data);
+      break;
+    case 'sent_ack':
+      handleSentAck(data);
+      break;
+  }
+}
+
+async function handleSystemMsg(data) {
+  switch (data.event) {
+    case 'room_info':
+      state.userCount = data.user_count;
+      updateUserCount(data.user_count);
+      break;
+
+    case 'user_joined':
+      state.userCount = data.user_count;
+      updateUserCount(data.user_count);
+      appendSysMsg(`${data.username} joined`);
+      // Cancel waiting overlay if we now have 2 users
+      if (data.user_count >= 2) stopWaitingOverlay();
+      break;
+
+    case 'user_left':
+      state.userCount = data.user_count;
+      updateUserCount(data.user_count);
+      appendSysMsg(`${data.username} left`);
+      break;
+
+    case 'warning':
+      appendSysMsg(data.message, true);
+      break;
+
+    case 'room_closing':
+      appendSysMsg(data.message, true);
+      stopWaitingOverlay();
+      break;
+
+    case 'message_expired':
+      expireMessage(data.msg_id);
+      break;
+  }
+}
+
+// ── Incoming message (decrypt) ─────────────────────────────
+async function handleIncoming(data) {
+  let text;
+  try {
+    text = await decrypt(data.ciphertext, data.iv);
+  } catch {
+    text = '[decryption failed]';
+  }
+
+  const el = renderMessage({
+    msgId:      data.msg_id,
+    mine:       false,
+    text,
+    sentAt:     data.sent_at,
+    senderName: data.sender_name,
+    userCount:  data.user_count,
+  });
+
+  state.messages.set(data.msg_id, el);
+
+  // Send delivery ack
+  state.ws.send(JSON.stringify({ type: 'ack', msg_id: data.msg_id }));
+
+  // Start expiry bar
+  setTimeout(() => startExpiryBar(el, data.msg_id), 50);
+}
+
+// ── Sent ack ───────────────────────────────────────────────
+function handleSentAck(data) {
+  const el = state.messages.get(data.msg_id);
+  if (!el) return;
+  const statusEl = el.querySelector('.msg-status');
+  if (statusEl) {
+    statusEl.textContent = '✓ delivered';
+    statusEl.className = 'msg-status delivered';
+  }
+  startExpiryBar(el, data.msg_id);
+}
+
+// ── Send message ───────────────────────────────────────────
+async function sendMessage() {
+  const input = $('msg-input');
+  const text = input.value.trim();
+  if (!text || !state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+
+  const msgId = crypto.randomUUID();
+  const { ciphertext, iv } = await encrypt(text);
+
+  // Optimistic render
+  const el = renderMessage({
+    msgId,
+    mine: true,
+    text,
+    sentAt: Date.now() / 1000,
+    senderName: state.username,
+    userCount: state.userCount,
+    status: 'transit',
+  });
+  state.messages.set(msgId, el);
+
+  state.ws.send(JSON.stringify({ type: 'message', ciphertext, iv, client_msg_id: msgId }));
+}
+
+$('send-btn').onclick = sendMessage;
+$('msg-input').onkeydown = e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+};
+$('msg-input').oninput = function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 140) + 'px';
+};
+
+// ── Leave ──────────────────────────────────────────────────
+$('leave-btn').onclick = () => {
+  if (state.ws) state.ws.close();
+  stopWaitingOverlay();
+  // Reset state
+  state = {
+    username: state.username,
+    userId: crypto.randomUUID(),
+    roomId: '', roomName: '', password: '',
+    cryptoKey: null, ws: null,
+    messages: new Map(), userCount: 1,
+    isCreator: false, waitingTimer: null, waitingSeconds: 600,
+  };
+  $('messages-area').innerHTML = '';
+  showScreen('screen-choice');
+};
+
+// ── Render message ─────────────────────────────────────────
+function renderMessage({ msgId, mine, text, sentAt, senderName, userCount, status }) {
+  const area  = $('messages-area');
+  const group = document.createElement('div');
+  group.className = 'msg-group ' + (mine ? 'mine' : 'theirs');
+  group.dataset.msgId = msgId;
+
+  const showSender = !mine && userCount > 2;
+
+  group.innerHTML = `
+    ${showSender ? `<div class="msg-sender">${escHtml(senderName)}</div>` : ''}
+    <div class="msg-bubble">
+      ${escHtml(text)}
+      <div class="expiry-bar" id="bar-${msgId}"></div>
+    </div>
+    <div class="msg-meta">
+      <span class="msg-time">${formatTime(sentAt)}</span>
+      ${mine ? `<span class="msg-status ${status || 'transit'}">${status === 'transit' ? '⟳ sending' : '✓ delivered'}</span>` : ''}
+    </div>
+  `;
+
+  area.appendChild(group);
+  area.scrollTop = area.scrollHeight;
+  return group;
+}
+
+// ── Expiry bar (60s countdown) ─────────────────────────────
+function startExpiryBar(el, msgId) {
+  const bar = el.querySelector('.expiry-bar');
+  if (!bar) return;
+  // Force reflow then animate
+  bar.offsetHeight;
+  bar.classList.add('ticking');
+
+  setTimeout(() => {
+    el.querySelector('.msg-bubble')?.classList.add('expiring');
+  }, 50000); // warn at 50s
+}
+
+function expireMessage(msgId) {
+  const el = state.messages.get(msgId);
+  if (!el) return;
+  el.style.transition = 'opacity 0.8s, transform 0.8s';
+  el.style.opacity = '0';
+  el.style.transform = 'scale(0.92)';
+  setTimeout(() => el.remove(), 800);
+  state.messages.delete(msgId);
+}
+
+// ── System message ─────────────────────────────────────────
+function appendSysMsg(text, warn = false) {
+  const area = $('messages-area');
+  const el = document.createElement('div');
+  el.className = 'sys-msg' + (warn ? ' warn' : '');
+  el.textContent = text;
+  area.appendChild(el);
+  area.scrollTop = area.scrollHeight;
+}
+
+function updateUserCount(n) {
+  $('header-user-count').textContent = n;
+}
+
+// ── Waiting overlay ────────────────────────────────────────
+function startWaitingOverlay() {
+  $('waiting-room-id').textContent = state.roomId;
+  $('waiting-overlay').classList.add('show');
+
+  let secs = 600;
+  const progress = $('timer-ring-progress');
+  const textEl   = $('timer-ring-text');
+  const circumference = 2 * Math.PI * 26; // ≈ 163.4
+  progress.style.strokeDasharray = circumference;
+
+  state.waitingTimer = setInterval(() => {
+    secs--;
+    const frac = secs / 600;
+    progress.style.strokeDashoffset = circumference * (1 - frac);
+    if (secs <= 60) progress.style.stroke = 'var(--warn)';
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    textEl.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+    if (secs <= 0) stopWaitingOverlay();
+  }, 1000);
+}
+
+function stopWaitingOverlay() {
+  $('waiting-overlay').classList.remove('show');
+  if (state.waitingTimer) {
+    clearInterval(state.waitingTimer);
+    state.waitingTimer = null;
+  }
+}
+
+// ── Crypto (WebCrypto API) ─────────────────────────────────
+async function deriveKey(password, roomId) {
+  const enc  = new TextEncoder();
+  const raw  = enc.encode(password);
+  const salt = enc.encode(roomId + ':void-salt-v1');
+
+  const baseKey = await crypto.subtle.importKey(
+    'raw', raw, 'PBKDF2', false, ['deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 200000, hash: 'SHA-256' },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encrypt(plaintext) {
+  const iv  = crypto.getRandomValues(new Uint8Array(12));
+  const enc = new TextEncoder();
+  const ct  = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    state.cryptoKey,
+    enc.encode(plaintext)
+  );
+  return {
+    ciphertext: bufToB64(ct),
+    iv: bufToB64(iv),
+  };
+}
+
+async function decrypt(ciphertext, iv) {
+  const ct  = b64ToBuf(ciphertext);
+  const ivB = b64ToBuf(iv);
+  const pt  = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: ivB },
+    state.cryptoKey,
+    ct
+  );
+  return new TextDecoder().decode(pt);
+}
+
+// ── Utilities ──────────────────────────────────────────────
+function bufToB64(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+function b64ToBuf(b64) {
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf.buffer;
+}
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function formatTime(ts) {
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function showError(id, msg) {
+  const el = $(id);
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+</script>
+</body>
+</html>
